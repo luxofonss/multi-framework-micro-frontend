@@ -1,28 +1,53 @@
-import { BrowserModule } from '@angular/platform-browser';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { NgModule } from '@angular/core';
-
+import { BrowserModule } from '@angular/platform-browser';
+import { Router, RouterModule, Routes } from '@angular/router';
 import { AppComponent } from './app.component';
-import { RouterModule } from '@angular/router';
 import { HomeComponent } from './home/home.component';
-import { startsWith } from './router.utils';
-import { WrapperComponent } from './wrapper/wrapper.component';
+import { startsWith } from './router.utils'; // Hàm matcher
+import { RemoteConf, WrapperComponent } from './wrapper/wrapper.component';
+
+const initialRoutes: Routes = [
+  { path: '', component: HomeComponent, pathMatch: 'full' },
+];
+
+interface DataInterface {
+  configs: RemoteConf[];
+}
 
 @NgModule({
   imports: [
     BrowserModule,
-    RouterModule.forRoot([
-    { path: '', component: HomeComponent, pathMatch: 'full' },
-    { matcher: startsWith('mfe1'), component: WrapperComponent, data: { importName: 'mfe1', elementName: 'mfe1-element' } },
-    { matcher: startsWith('mfe2'), component: WrapperComponent, data: { importName: 'mfe2', elementName: 'mfe2-element' } },
-    { matcher: startsWith('mfe3'), component: WrapperComponent, data: { importName: 'mfe3', elementName: 'mfe3-element' } },
-    { matcher: startsWith('mfe4'), component: WrapperComponent, data: { importName: 'mfe4', elementName: 'mfe4-element' } },
-], { relativeLinkResolution: 'legacy' })
+    HttpClientModule,
+    RouterModule.forRoot(initialRoutes),
   ],
-  declarations: [
-    AppComponent,
-    WrapperComponent
-  ],
+  declarations: [AppComponent, HomeComponent, WrapperComponent],
   providers: [],
-  bootstrap: [AppComponent]
+  bootstrap: [AppComponent],
 })
-export class AppModule { }
+export class AppModule {
+  constructor(private router: Router, private http: HttpClient) {
+    this.loadDynamicRoutes();
+  }
+
+  private loadDynamicRoutes() {
+    this.http
+      .get<DataInterface>('http://localhost:8080/configs')
+      .subscribe((routes: DataInterface) => {
+        console.log(routes);
+        const dynamicRoutes = routes?.configs?.map((route) => {
+          console.log(route);
+          return {
+            matcher: startsWith(route.importName), // Sử dụng matcher từ route.startWith
+            component: WrapperComponent,
+            data: {
+              importName: route.importName,
+              elementName: route.elementName,
+            },
+          };
+        });
+
+        this.router.resetConfig([...this.router.config, ...dynamicRoutes]);
+      });
+  }
+}
